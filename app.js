@@ -73,7 +73,50 @@ function addDep() {
 
 // Add a role
 function addRole() {
+    let deptObj = { };
+    let deptArray = [];
 
+    db.query('SELECT * FROM department', (err, rows) => {
+        if (err) throw err;
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const key = row.name;
+            const value = row.id;
+
+            deptObj[key] = value;
+            deptArray.push(key);
+        }
+    })
+
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'title',
+            message: 'What is the title of the new position?'
+        },
+        {
+            type: 'number',
+            name: 'salary',
+            message: 'What is the salary for this role?'
+        },
+        {
+            type: 'list',
+            name: 'department',
+            message: 'What department is this role in?',
+            choices: deptArray
+        }
+    ]).then(responses => {
+        const deptId = deptObj[responses.department];
+        
+        const sql = `INSERT INTO role (title, salary, department_id) VALUES (?,?,?)`;
+        const params = [responses.title, responses.salary, deptId];
+
+        db.query(sql, params, (err, result) => {
+            if (err) throw err;
+            console.log('Added a new role!');
+            chooseAction();
+        })
+    });
 };
 
 // Add an employee
