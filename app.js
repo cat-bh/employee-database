@@ -20,7 +20,7 @@ function viewDep() {
         if (err) throw err;
         console.table(rows);
         chooseAction();
-    })  
+    })
 };
 
 // View roles 
@@ -73,7 +73,7 @@ function addDep() {
 
 // Add a role
 function addRole() {
-    let deptObj = { };
+    let deptObj = {};
     let deptArray = [];
 
     // Get current department names
@@ -109,7 +109,7 @@ function addRole() {
         }
     ]).then(responses => {
         const deptId = deptObj[responses.department];
-        
+
         const sql = `INSERT INTO role (title, salary, department_id) VALUES (?,?,?)`;
         const params = [responses.title, responses.salary, deptId];
 
@@ -123,90 +123,147 @@ function addRole() {
 
 // Add an employee
 function addEmploy() {
-    let roleArray = [];
-    let roleObj = {};
-    let managerArray = [];
-    let managerObj = {};
-
-    // Get all current roles and ids
-    db.query('SELECT id, title FROM role', (err, rows) => {
-        if(err) throw err;
-        for(let i = 0; i < rows.length; i++) {
-            const key = rows[i].title;
-            const value = rows[i].id;
-
-            roleObj[key] = value;
-            roleArray.push(key);
-        }
-    })
-
-    // Get a list of current employees
-    const managerSql = `SELECT id, concat(first_name, ' ', last_name) manager FROM employee`;
-    db.query(managerSql, (err, rows) => {
-        if(err) throw err;
-        for(let i = 0; i < rows.length; i++) {
-            const key = rows[i].manager;
-            const value = rows[i].id;
-
-            managerObj[key] = value;
-            managerArray.push(key);
-        }
-    })
 
     console.log('Adding a new employee:');
-    inquirer.prompt([
-        {
-            type: 'input',
-            name: 'firstName',
-            message: "What is the employee's first name?"
-        },
-        {
-            type: 'input',
-            name: 'lastName',
-            message: 'What is their last name?'
-        },
-        {
-            type: 'list',
-            name: 'role',
-            message: 'What is their role?',
-            choices: roleArray
-        },
-        {
-            type: 'list',
-            name: 'manager',
-            message: 'Who is their manager?',
-            choices: managerArray
-        }
-    ]).then(responses => {
-        const roleId = roleObj[responses.role];
-        const managerId = managerObj[responses.manager];
+    getCurrentData()
+        .then(dbResponse => {
+            const roleArray = dbResponse.roleArr;
+            const roleObj = dbResponse.roleObj;
+            const managerArray = dbResponse.employeeArr;
+            const managerObj = dbResponse.employeeObj;
 
-        const sql = `INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
-        const params = [responses.firstName, responses.lastName, roleId, managerId];
+            inquirer.prompt([
+                {
+                    type: 'input',
+                    name: 'firstName',
+                    message: "What is the employee's first name?"
+                },
+                {
+                    type: 'input',
+                    name: 'lastName',
+                    message: 'What is their last name?'
+                },
+                {
+                    type: 'list',
+                    name: 'role',
+                    message: 'What is their role?',
+                    choices: roleArray
+                },
+                {
+                    type: 'list',
+                    name: 'manager',
+                    message: 'Who is their manager?',
+                    choices: managerArray
+                }
+            ]).then(responses => {
+                const roleId = roleObj[responses.role];
+                const managerId = managerObj[responses.manager];
 
-        db.query(sql, params, (err, result) => {
-            if (err) throw err;
-            console.log('Added a new employee!');
-            chooseAction();
+                const sql = `INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?,?,?,?)`;
+                const params = [responses.firstName, responses.lastName, roleId, managerId];
+
+                db.query(sql, params, (err, result) => {
+                    if (err) throw err;
+                    console.log('Added a new employee!');
+                    chooseAction();
+                })
+            })
         })
-
-    })
 };
 
 // update an employee's role
 function updateRole() {
 
+    getCurrentData()
+        .then(dbResponse => {
+            const roleArray = dbResponse.roleArr;
+            const roleObj = dbResponse.roleObj;
+            const employeeArray = dbResponse.employeeArr;
+            const employeeObj = dbResponse.employeeObj;
+
+            inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'person',
+                    message: 'Who would you like to update?',
+                    choices: employeeArray
+                },
+                {
+                    type: 'list',
+                    name: 'position',
+                    message: 'What is their new role?',
+                    choices: roleArray
+                }
+            ]).then(responses => {
+                const employId = employeeObj[responses.person];
+                const roleId = roleObj[responses.position];
+
+                const sql = `UPDATE employee SET role_id = ? WHERE id = ?`;
+                const params = [roleId, employId];
+                db.query(sql, params, (err, result) => {
+                    if (err) throw err;
+                    console.log('Update successfull');
+                    chooseAction();
+                })
+            })
+        })
 };
 
 function quit() {
     console.log('Press control + C to exit');
 };
 
+// queries the database for current employees and role, returns a promise
+const getCurrentData = () => {
+    return new Promise((resolve, reject) => {
+        let employeeArray = [];
+        let employeeObj = {};
+        let roleArray = [];
+        let roleObj = {};
+
+        const employeeSql = `SELECT id, concat(first_name, ' ', last_name) manager FROM employee`;
+        db.query(employeeSql, (err, rows) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            for (let i = 0; i < rows.length; i++) {
+                const key = rows[i].manager;
+                const value = rows[i].id;
+
+                employeeObj[key] = value;
+                employeeArray.push(key);
+            }
+        })
+
+        db.query('SELECT id, title FROM role', (err, rows) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            for (let i = 0; i < rows.length; i++) {
+                const key = rows[i].title;
+                const value = rows[i].id;
+
+                roleObj[key] = value;
+                roleArray.push(key);
+            }
+            resolve({
+                ok: true,
+                employeeObj: employeeObj,
+                employeeArr: employeeArray,
+                roleObj: roleObj,
+                roleArr: roleArray
+            });
+        })
+    });
+}
+
 // Ask what the user would like to do and redirect
 function chooseAction() {
     inquirer.prompt(actions)
         .then(answer => {
-            switch(answer.action) {
+            switch (answer.action) {
                 case 'View departments': viewDep();
                     break;
                 case 'View employees': listEmployees();
@@ -223,7 +280,7 @@ function chooseAction() {
                     break;
                 case 'Finish': quit();
             }
-            
+
         });
 };
 
